@@ -36,8 +36,9 @@ app.config['SECRET_KEY'] = 'jarvis-secret-key-2025'
 # Initialize SocketIO
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# Global JARVIS instance
-jarvis_instance: Optional[JARVISPrototype] = None
+# Use persistent singleton JARVIS instance
+from jarvis.core.parallel_manager import get_jarvis_instance
+jarvis_instance = get_jarvis_instance()
 camera_thread: Optional[threading.Thread] = None
 camera_running = False
 
@@ -230,26 +231,24 @@ class WebJARVIS:
     def get_camera_frame(self) -> Optional[str]:
         """Get current camera frame as base64 encoded image"""
         if not self.jarvis or not self.jarvis.vision_manager:
+            logger.error("JARVIS or vision manager not available")
             return None
-        
         try:
-            # Start camera if not active
+            # Only start vision system once at startup, not per request
             if not self.jarvis.vision_manager.is_monitoring:
+                logger.info("Starting vision system (first time only)...")
                 self.jarvis.vision_manager.start_vision_system()
                 time.sleep(0.5)  # Wait for camera to stabilize
-            
             frame = self.jarvis.vision_manager.camera.get_current_frame()
             if frame is not None:
                 # Encode frame as JPEG
                 _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                
-                # Convert to base64
                 frame_base64 = base64.b64encode(buffer).decode('utf-8')
                 return f"data:image/jpeg;base64,{frame_base64}"
-            
+            else:
+                logger.warning("No camera frame available to return")
         except Exception as e:
             logger.error(f"Error getting camera frame: {e}")
-        
         return None
     
     def take_photo(self) -> Dict[str, Any]:
@@ -272,7 +271,7 @@ class WebJARVIS:
             logger.error(f"Error taking photo: {e}")
             return {'success': False, 'message': str(e)}
 
-# Global web JARVIS instance
+# Global web JARVIS instance (initialized once)
 web_jarvis = WebJARVIS()
 
 @app.route('/')

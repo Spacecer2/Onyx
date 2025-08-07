@@ -192,7 +192,7 @@ def test_imports():
     
     # Test NeMo separately
     try:
-        import nemo
+        import NeMo
         print("✅ NVIDIA NeMo import OK")
     except ImportError as e:
         print(f"⚠️ NVIDIA NeMo import failed: {e}")

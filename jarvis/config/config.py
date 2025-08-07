@@ -48,7 +48,7 @@ class TTSConfig:
 @dataclass
 class VisionConfig:
     """Computer vision configuration"""
-    camera_index: int = 0
+    camera_index: int = 0  # Confirmed working index from test
     resolution: tuple = (640, 480)
     fps: int = 30
     

@@ -60,7 +60,12 @@ class CameraManager:
                 self.cap.release()
                 return False
             
-            logger.info(f"Camera initialized: {frame.shape[1]}x{frame.shape[0]} @ {self.fps}fps")
+            # Log actual properties after setting
+            actual_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+            actual_height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+            actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
+            logger.info(f"Camera initialized with actual: {actual_width}x{actual_height} @ {actual_fps}fps")
+            
             return True
             
         except Exception as e:
@@ -86,6 +91,13 @@ class CameraManager:
         self.capture_thread.start()
         
         logger.info("Camera capture started")
+        
+        # Wait a moment and check if frames are being captured
+        time.sleep(1)
+        if self.frames_captured == 0:
+            logger.warning("No frames captured after 1 second - possible issue")
+        else:
+            logger.info(f"Captured {self.frames_captured} frames in first second")
     
     def stop_capture(self):
         """Stop frame capture"""
@@ -143,6 +155,8 @@ class CameraManager:
     def get_current_frame(self) -> Optional[np.ndarray]:
         """Get the most recent frame"""
         with self.frame_lock:
+            if self.current_frame is None:
+                logger.warning("No current frame available")
             return self.current_frame.copy() if self.current_frame is not None else None
     
     def capture_photo(self, filename: Optional[str] = None) -> Optional[str]:
@@ -217,16 +231,16 @@ class VisionManager:
     
     def start_vision_system(self):
         """Start the complete vision system"""
-        print("📷 Starting camera system...")
+        logger.info("📷 Starting camera system...")
         
         if not self.camera.initialize_camera():
-            print("❌ Failed to initialize camera")
+            logger.error("❌ Failed to initialize camera")
             return False
         
         self.camera.start_capture(frame_callback=self._on_frame_captured)
         self.is_monitoring = True
         
-        print("✅ Camera system active!")
+        logger.info("✅ Camera system active!")
         return True
     
     def stop_vision_system(self):
