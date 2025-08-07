@@ -1,0 +1,73 @@
+# JARVIS AI Assistant - Docker Compose Configuration
+version: '3.8'
+
+services:
+  jarvis:
+    build: .
+    container_name: jarvis-ai-assistant
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./jarvis/logs:/app/jarvis/logs
+      - ./jarvis/photos:/app/jarvis/photos
+      - ./jarvis/temp:/app/jarvis/temp
+      - /dev/snd:/dev/snd  # Audio device access
+    devices:
+      - /dev/video0:/dev/video0  # Camera access
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
+      - NEWS_API_KEY=${NEWS_API_KEY:-}
+      - JARVIS_NAME=JARVIS
+      - JARVIS_VOICE_ENABLED=true
+      - JARVIS_CAMERA_ENABLED=true
+      - JARVIS_WEB_ENABLED=true
+      - WEB_HOST=0.0.0.0
+      - WEB_PORT=5000
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - jarvis-network
+
+  # Optional: Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: jarvis-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - jarvis-network
+
+  # Optional: PostgreSQL for data persistence
+  postgres:
+    image: postgres:15-alpine
+    container_name: jarvis-postgres
+    environment:
+      - POSTGRES_DB=jarvis
+      - POSTGRES_USER=jarvis
+      - POSTGRES_PASSWORD=jarvis_secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - jarvis-network
+
+networks:
+  jarvis-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  postgres_data:

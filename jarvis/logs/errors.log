@@ -1,0 +1,4 @@
+2025-08-07 17:55:07,563 - jarvis.core.reliability_manager - ERROR - Error in test_component: Test context: Test error
+2025-08-07 17:55:07,563 - jarvis.core.reliability_manager - WARNING - Component error reported: test_component - Test context: Test error
+2025-08-07 17:55:12,296 - jarvis.core.task_queue - WARNING - TaskQueue already running
+2025-08-07 17:55:36,863 - jarvis.core.parallel_manager - ERROR - Error processing command: No module named 'wikipedia'

@@ -1,0 +1,29 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=JARVIS AI Assistant
+Comment=Advanced AI Assistant with Voice Recognition, Computer Vision, and Web Interface
+Exec=/home/neo/Documents/augment-projects/Sauron/launch_jarvis_desktop.sh
+Icon=/home/neo/Documents/augment-projects/Sauron/jarvis/web/static/jarvis-icon.png
+Terminal=false
+StartupNotify=true
+Categories=Office;Development;AudioVideo;Network;
+Keywords=AI;Assistant;Voice;JARVIS;Artificial Intelligence;
+StartupWMClass=JARVIS
+MimeType=text/plain;
+Actions=WebInterface;Terminal;Docker;
+
+[Desktop Action WebInterface]
+Name=Web Interface
+Exec=/home/neo/Documents/augment-projects/Sauron/launch_jarvis_desktop.sh --web
+Icon=/home/neo/Documents/augment-projects/Sauron/jarvis/web/static/jarvis-icon.png
+
+[Desktop Action Terminal]
+Name=Terminal Mode
+Exec=gnome-terminal -- /home/neo/Documents/augment-projects/Sauron/launch_jarvis_desktop.sh --terminal
+Icon=utilities-terminal
+
+[Desktop Action Docker]
+Name=Docker Deployment
+Exec=/home/neo/Documents/augment-projects/Sauron/launch_jarvis_desktop.sh --docker
+Icon=docker

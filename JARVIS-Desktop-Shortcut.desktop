@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=🤖 JARVIS AI Assistant
+Comment=Launch JARVIS AI Assistant with Voice Recognition and Web Interface
+Exec=/home/neo/Documents/augment-projects/Sauron/launch_jarvis_desktop.sh --web
+Icon=/home/neo/Documents/augment-projects/Sauron/jarvis/web/static/jarvis-icon.svg
+Terminal=false
+StartupNotify=true
+Categories=Office;Development;AudioVideo;Network;
+Keywords=AI;Assistant;Voice;JARVIS;Artificial Intelligence;
+StartupWMClass=JARVIS

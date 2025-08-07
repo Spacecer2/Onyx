@@ -1,0 +1,83 @@
+# JARVIS Docker Ignore File
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+nemo_env/
+jarvis_env/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+jarvis/logs/*.log
+
+# Temporary files
+jarvis/temp/*
+jarvis/photos/*.jpg
+jarvis/photos/*.png
+
+# Models (too large for container)
+jarvis/models/*
+*.nemo
+*.pt
+*.pth
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+docs/
+
+# Tests
+tests/
+test_*.py
+*_test.py
+
+# Environment files with secrets
+.env.local
+.env.production

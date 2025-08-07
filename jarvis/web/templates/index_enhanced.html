@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS AI Assistant - Enhanced Interface</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/enhanced_style.css') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='jarvis-icon.svg') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Background Effects -->
+        <div class="background-effects">
+            <div class="grid-overlay"></div>
+            <div class="particle-field" id="particle-field"></div>
+        </div>
+
+        <!-- Header -->
+        <header class="app-header">
+            <div class="glass-panel header-panel">
+                <div class="logo-section">
+                    <div class="logo-icon">
+                        <svg width="32" height="32" viewBox="0 0 128 128">
+                            <circle cx="64" cy="64" r="60" fill="url(#jarvisGradient)" opacity="0.9"/>
+                            <circle cx="64" cy="64" r="45" fill="none" stroke="#00d4ff" stroke-width="2" opacity="0.7"/>
+                            <circle cx="64" cy="64" r="8" fill="#ffffff" opacity="0.9"/>
+                            <defs>
+                                <linearGradient id="jarvisGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#0066aa;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                    <div class="logo-text">
+                        <h1>JARVIS</h1>
+                        <span>AI Assistant</span>
+                    </div>
+                </div>
+                
+                <div class="system-status">
+                    <div class="status-item" id="audio-status-header">
+                        <div class="status-dot"></div>
+                        <span>Audio</span>
+                    </div>
+                    <div class="status-item" id="camera-status-header">
+                        <div class="status-dot"></div>
+                        <span>Camera</span>
+                    </div>
+                    <div class="status-item" id="ai-status-header">
+                        <div class="status-dot"></div>
+                        <span>AI</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- JARVIS Core Animation (Center) -->
+            <section class="jarvis-core-section">
+                <div class="jarvis-core-container">
+                    <div class="jarvis-core" id="jarvis-core">
+                        <!-- Outer rings -->
+                        <div class="core-ring ring-1"></div>
+                        <div class="core-ring ring-2"></div>
+                        <div class="core-ring ring-3"></div>
+                        <div class="core-ring ring-4"></div>
+                        
+                        <!-- Arc segments -->
+                        <div class="arc-segment arc-1"></div>
+                        <div class="arc-segment arc-2"></div>
+                        <div class="arc-segment arc-3"></div>
+                        <div class="arc-segment arc-4"></div>
+                        <div class="arc-segment arc-5"></div>
+                        <div class="arc-segment arc-6"></div>
+                        
+                        <!-- Center core -->
+                        <div class="center-core">
+                            <div class="inner-glow"></div>
+                            <div class="core-pulse"></div>
+                            <div class="core-text" id="core-text">READY</div>
+                        </div>
+                        
+                        <!-- Status indicators around the core -->
+                        <div class="status-indicators">
+                            <div class="status-indicator audio-indicator" id="audio-indicator">
+                                <div class="indicator-dot"></div>
+                                <span>AUDIO</span>
+                            </div>
+                            <div class="status-indicator camera-indicator" id="camera-indicator">
+                                <div class="indicator-dot"></div>
+                                <span>VISION</span>
+                            </div>
+                            <div class="status-indicator ai-indicator" id="ai-indicator">
+                                <div class="indicator-dot"></div>
+                                <span>AI</span>
+                            </div>
+                            <div class="status-indicator system-indicator" id="system-indicator">
+                                <div class="indicator-dot"></div>
+                                <span>SYSTEM</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Mood/Activity text -->
+                        <div class="mood-display" id="mood-display">
+                            <div class="mood-text" id="mood-text">STANDBY</div>
+                            <div class="activity-text" id="activity-text">Ready for commands</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Side Panels -->
+            <div class="side-panels">
+                <!-- Camera Feed (Left) -->
+                <section class="camera-section">
+                    <div class="glass-panel camera-panel">
+                        <div class="panel-header">
+                            <h2>Visual Feed</h2>
+                            <div class="camera-controls">
+                                <button class="glass-button" id="photo-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                                        <circle cx="12" cy="13" r="4"></circle>
+                                    </svg>
+                                    Photo
+                                </button>
+                            </div>
+                        </div>
+                        <div class="camera-container">
+                            <canvas id="camera-canvas" width="320" height="240"></canvas>
+                            <div class="camera-overlay">
+                                <div class="scanning-line"></div>
+                                <div class="corner-brackets">
+                                    <div class="bracket top-left"></div>
+                                    <div class="bracket top-right"></div>
+                                    <div class="bracket bottom-left"></div>
+                                    <div class="bracket bottom-right"></div>
+                                </div>
+                                <div class="camera-info">
+                                    <div class="info-line">
+                                        <span class="rec-indicator">●</span>
+                                        <span>REC</span>
+                                    </div>
+                                    <div class="info-line" id="timestamp"></div>
+                                    <div class="info-line" id="camera-resolution">320x240</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Chat Interface (Right) -->
+                <section class="chat-section">
+                    <div class="glass-panel chat-panel">
+                        <div class="panel-header">
+                            <h2>Conversation</h2>
+                            <div class="voice-controls">
+                                <button class="glass-button voice-btn" id="listen-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                                    </svg>
+                                    Listen
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="chat-messages" id="chat-messages">
+                            <div class="message system-message">
+                                <div class="message-content">
+                                    <div class="message-text">JARVIS AI Assistant initialized. Ready for commands.</div>
+                                    <div class="message-time" id="init-time"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="chat-input-container">
+                            <div class="input-wrapper">
+                                <input type="text" id="chat-input" placeholder="Type your message or use voice..." autocomplete="off">
+                                <button class="send-btn" id="send-btn">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- System Info Panel (Bottom) -->
+        <footer class="system-info">
+            <div class="glass-panel info-panel">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Status:</span>
+                        <span class="info-value" id="system-status-text">Online</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Uptime:</span>
+                        <span class="info-value" id="uptime">00:00:00</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Commands:</span>
+                        <span class="info-value" id="command-count">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Mode:</span>
+                        <span class="info-value" id="current-mode">Enhanced</span>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='js/enhanced_jarvis.js') }}"></script>
+</body>
+</html>

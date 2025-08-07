@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS AI Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Background Effects -->
+        <div class="background-effects">
+            <div class="gradient-orb orb-1"></div>
+            <div class="gradient-orb orb-2"></div>
+            <div class="gradient-orb orb-3"></div>
+        </div>
+
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <div class="pulse-ring"></div>
+                        <div class="jarvis-core"></div>
+                    </div>
+                    <h1>JARVIS</h1>
+                </div>
+                <div class="status-indicators">
+                    <div class="status-item" id="asr-status">
+                        <div class="status-dot"></div>
+                        <span>Speech Recognition</span>
+                    </div>
+                    <div class="status-item" id="tts-status">
+                        <div class="status-dot"></div>
+                        <span>Text-to-Speech</span>
+                    </div>
+                    <div class="status-item" id="camera-status">
+                        <div class="status-dot"></div>
+                        <span>Camera</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Camera Feed -->
+            <section class="camera-section">
+                <div class="glass-panel camera-panel">
+                    <div class="panel-header">
+                        <h2>Visual Feed</h2>
+                        <div class="camera-controls">
+                            <button class="glass-button" id="photo-btn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                                    <circle cx="12" cy="13" r="4"></circle>
+                                </svg>
+                                Photo
+                            </button>
+                        </div>
+                    </div>
+                    <div class="camera-container">
+                        <img id="camera-feed" src="" alt="Camera Feed" />
+                        <div class="camera-overlay">
+                            <div class="scanning-line"></div>
+                        </div>
+                        <div class="camera-info">
+                            <span id="camera-resolution">640x480</span>
+                            <span id="camera-fps">30 FPS</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Chat Interface -->
+            <section class="chat-section">
+                <div class="glass-panel chat-panel">
+                    <div class="panel-header">
+                        <h2>Conversation</h2>
+                        <div class="voice-controls">
+                            <button class="glass-button voice-btn" id="listen-btn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                                </svg>
+                                Listen
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message system-message">
+                            <div class="message-content">
+                                <div class="message-text">JARVIS AI Assistant initialized. Ready for commands.</div>
+                                <div class="message-time" id="init-time"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-container">
+                        <div class="input-wrapper">
+                            <input type="text" id="text-input" placeholder="Type a command or use voice..." />
+                            <button class="send-btn" id="send-btn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- System Info Panel -->
+        <aside class="system-panel">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <h3>System Status</h3>
+                </div>
+                <div class="system-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Device</span>
+                        <span class="stat-value" id="device-info">CUDA</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Photos Taken</span>
+                        <span class="stat-value" id="photos-count">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Uptime</span>
+                        <span class="stat-value" id="uptime">00:00:00</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Notification System -->
+        <div class="notification-container" id="notifications"></div>
+    </div>
+
+    <!-- Audio Elements -->
+    <audio id="notification-sound" preload="auto">
+        <source src="{{ url_for('static', filename='sounds/notification.mp3') }}" type="audio/mpeg">
+    </audio>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
