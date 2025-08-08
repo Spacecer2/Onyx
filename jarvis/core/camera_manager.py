@@ -6,7 +6,11 @@ import time
 import threading
 import logging
 import queue
-import cv2
+# Optional dependency: OpenCV might be unavailable in CI/minimal envs
+try:
+    import cv2  # type: ignore
+except Exception:  # pragma: no cover
+    cv2 = None  # type: ignore
 import numpy as np
 from typing import Optional, Callable, Dict, Any, List
 from dataclasses import dataclass
@@ -27,6 +31,7 @@ class CameraState(Enum):
     CAPTURING = "capturing"
     ERROR = "error"
     RECOVERING = "recovering"
+    DISABLED = "disabled"
 
 @dataclass
 class CameraConfig:
@@ -68,7 +73,7 @@ class RobustCameraManager:
         
         # Camera system
         self.camera = None
-        self.state = CameraState.STOPPED
+        self.state = CameraState.STOPPED if cv2 is not None else CameraState.DISABLED
         
         # Frame buffering
         self.frame_buffer = queue.Queue(maxsize=30)  # 1 second at 30fps
@@ -113,6 +118,11 @@ class RobustCameraManager:
     
     def initialize(self) -> bool:
         """Initialize camera system with retry logic"""
+        if cv2 is None:
+            logger.warning("OpenCV not available. Camera subsystem disabled.")
+            with self.lock:
+                self.state = CameraState.DISABLED
+            return False
         with self.lock:
             if self.state == CameraState.INITIALIZING:
                 logger.warning("Camera system already initializing")
@@ -164,6 +174,9 @@ class RobustCameraManager:
     
     def start_capture(self) -> bool:
         """Start camera capture with error handling"""
+        if cv2 is None:
+            logger.warning("OpenCV not available. Cannot start capture.")
+            return False
         with self.lock:
             if self.state not in [CameraState.READY, CameraState.STOPPED]:
                 if self.state == CameraState.ERROR:
@@ -231,7 +244,7 @@ class RobustCameraManager:
         self._cleanup_camera_resources()
         
         with self.lock:
-            self.state = CameraState.STOPPED
+            self.state = CameraState.DISABLED if cv2 is None else CameraState.STOPPED
         
         logger.info("Camera capture stopped")
     
@@ -242,7 +255,7 @@ class RobustCameraManager:
                 return self.current_frame.frame.copy()
         return None
     
-    def get_buffered_frame(self, max_age: float = 1.0) -> Optional[CameraFrame]:
+    def get_buffered_frame(self, max_age: float = 1.0) -> Optional['CameraFrame']:
         """Get a recent frame from buffer"""
         current_time = time.time()
         
@@ -264,6 +277,9 @@ class RobustCameraManager:
     
     def capture_photo(self, filename: Optional[str] = None, max_retries: int = 3) -> Optional[str]:
         """Capture a photo with retry logic"""
+        if cv2 is None:
+            logger.warning("OpenCV not available. Cannot capture photo.")
+            return None
         for attempt in range(max_retries):
             try:
                 # Get a recent frame
@@ -351,6 +367,8 @@ class RobustCameraManager:
     
     def _find_working_camera_config(self) -> bool:
         """Find a working camera configuration"""
+        if cv2 is None:
+            return False
         logger.debug("Finding working camera configuration")
         
         # Try different camera indices
@@ -417,6 +435,8 @@ class RobustCameraManager:
     
     def _test_camera_capture(self) -> bool:
         """Test camera capture functionality"""
+        if cv2 is None:
+            return False
         try:
             logger.debug("Testing camera capture")
             
@@ -583,7 +603,7 @@ class RobustCameraManager:
 # Global robust camera manager instance
 robust_camera_manager = None
 
-def get_camera_manager() -> RobustCameraManager:
+def get_camera_manager() -> 'RobustCameraManager':
     """Get global camera manager instance"""
     global robust_camera_manager
     if robust_camera_manager is None:

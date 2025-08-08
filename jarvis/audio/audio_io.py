@@ -2,7 +2,12 @@
 Audio Input/Output handling for JARVIS
 """
 
-import pyaudio
+# Optional dependency: pyaudio may be unavailable in CI/minimal envs
+try:
+    import pyaudio  # type: ignore
+except Exception:  # pragma: no cover
+    pyaudio = None  # type: ignore
+
 import numpy as np
 import threading
 import time
@@ -29,7 +34,7 @@ class AudioRecorder:
         self.sample_rate = config.audio.sample_rate
         self.chunk_size = config.audio.chunk_size
         self.channels = config.audio.channels
-        self.format = pyaudio.paInt16
+        self.format = getattr(pyaudio, "paInt16", 8) if pyaudio else 8
         
         # Voice Activity Detection
         self.vad_threshold = config.audio.vad_threshold
@@ -37,7 +42,7 @@ class AudioRecorder:
         self.min_recording_duration = 0.5  # Minimum recording time
         
         # PyAudio setup
-        self.audio = pyaudio.PyAudio()
+        self.audio = pyaudio.PyAudio() if pyaudio else None
         self.stream = None
         self.recording_thread = None
         
@@ -49,6 +54,10 @@ class AudioRecorder:
     def start_recording(self):
         """Start continuous audio recording"""
         if self.is_recording:
+            return
+        
+        if self.audio is None:
+            logger.warning("PyAudio not available. Audio recording disabled.")
             return
         
         try:
@@ -76,9 +85,13 @@ class AudioRecorder:
         self.is_recording = False
         
         if self.stream:
-            self.stream.stop_stream()
-            self.stream.close()
-            self.stream = None
+            try:
+                self.stream.stop_stream()
+                self.stream.close()
+            except Exception as e:
+                logger.error(f"Error stopping audio stream: {e}")
+            finally:
+                self.stream = None
         
         logger.info("Audio recording stopped")
     
@@ -120,7 +133,7 @@ class AudioRecorder:
                 # Process the recorded audio
                 self._process_recording()
         
-        return (in_data, pyaudio.paContinue)
+        return (in_data, getattr(pyaudio, "paContinue", 0))
     
     def _detect_voice_activity(self, audio_chunk: np.ndarray) -> bool:
         """Simple voice activity detection based on energy"""
@@ -161,9 +174,15 @@ class AudioRecorder:
             # Convert to int16
             audio_int16 = (audio_data * 32767).astype(np.int16)
             
+            if self.audio is None:
+                logger.warning("PyAudio not available; cannot determine sample width accurately. Using 2 bytes.")
+                sample_width = 2
+            else:
+                sample_width = self.audio.get_sample_size(self.format)
+            
             with wave.open(filename, 'wb') as wf:
                 wf.setnchannels(self.channels)
-                wf.setsampwidth(self.audio.get_sample_size(self.format))
+                wf.setsampwidth(sample_width)
                 wf.setframerate(self.sample_rate)
                 wf.writeframes(audio_int16.tobytes())
             
@@ -185,18 +204,24 @@ class AudioRecorder:
     def __del__(self):
         """Cleanup when object is destroyed"""
         self.stop_recording()
-        if hasattr(self, 'audio'):
-            self.audio.terminate()
+        if hasattr(self, 'audio') and self.audio is not None:
+            try:
+                self.audio.terminate()
+            except Exception:
+                pass
 
 class AudioPlayer:
     """Audio playback system"""
     
     def __init__(self):
-        self.audio = pyaudio.PyAudio()
+        self.audio = pyaudio.PyAudio() if pyaudio else None
         self.is_playing = False
     
     def play_audio_data(self, audio_data: np.ndarray, sample_rate: Optional[int] = None):
         """Play audio data directly"""
+        if self.audio is None:
+            logger.warning("PyAudio not available. Skipping audio playback.")
+            return
         if sample_rate is None:
             sample_rate = config.audio.sample_rate
         
@@ -206,7 +231,7 @@ class AudioPlayer:
                 audio_data = (audio_data * 32767).astype(np.int16)
             
             stream = self.audio.open(
-                format=pyaudio.paInt16,
+                format=getattr(pyaudio, "paInt16", 8),
                 channels=1,
                 rate=sample_rate,
                 output=True
@@ -224,6 +249,9 @@ class AudioPlayer:
     
     def play_audio_file(self, filename: str):
         """Play audio from file"""
+        if self.audio is None:
+            logger.warning("PyAudio not available. Skipping audio file playback.")
+            return
         try:
             with wave.open(filename, 'rb') as wf:
                 # Get audio parameters
@@ -262,8 +290,11 @@ class AudioPlayer:
     
     def __del__(self):
         """Cleanup when object is destroyed"""
-        if hasattr(self, 'audio'):
-            self.audio.terminate()
+        if hasattr(self, 'audio') and self.audio is not None:
+            try:
+                self.audio.terminate()
+            except Exception:
+                pass
 
 class AudioManager:
     """High-level audio management"""

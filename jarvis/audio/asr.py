@@ -2,18 +2,27 @@
 Automatic Speech Recognition (ASR) module using NeMo
 """
 
-import torch
+# Guard optional heavy deps so imports don't crash in minimal environments
+try:
+    import torch  # type: ignore
+except Exception:  # pragma: no cover - fallback when torch isn't installed
+    torch = None  # type: ignore
+
+try:
+    import soundfile as sf  # type: ignore  # not required in fallback paths
+except Exception:  # pragma: no cover
+    sf = None  # type: ignore
+
 import numpy as np
-import soundfile as sf
 import logging
 from typing import Optional, List
 from pathlib import Path
 
 try:
-    import nemo.collections.asr as nemo_asr
+    import nemo.collections.asr as nemo_asr  # type: ignore
 except ImportError:
     print("Warning: NeMo ASR collection not available. Some features may not work.")
-    nemo_asr = None
+    nemo_asr = None  # type: ignore
 
 from ..config.config import config
 
@@ -42,7 +51,7 @@ class NeMoASR:
                 )
                 
                 # Move to appropriate device
-                if torch.cuda.is_available() and self.device == "cuda":
+                if torch is not None and getattr(torch, "cuda", None) and torch.cuda.is_available() and self.device == "cuda":
                     self.model = self.model.cuda()
                 else:
                     self.model = self.model.cpu()
@@ -70,7 +79,7 @@ class NeMoASR:
                 return self._mock_transcription(audio_file)
 
             # Load audio file with librosa for better handling
-            import librosa
+            import librosa  # Local import to avoid hard dep at import time
             audio_data, sample_rate = librosa.load(audio_file, sr=config.audio.sample_rate, mono=True)
 
             logger.debug(f"Loaded audio: shape={audio_data.shape}, sr={sample_rate}")
@@ -85,7 +94,8 @@ class NeMoASR:
     def transcribe_audio(self, audio_data: np.ndarray) -> str:
         """Transcribe audio data directly"""
         try:
-            if self.model is None:
+            # If model or torch unavailable, use mock
+            if self.model is None or torch is None:
                 return self._mock_transcription()
 
             # Ensure audio is in the right format
@@ -112,7 +122,7 @@ class NeMoASR:
 
             logger.debug(f"Audio tensor shape: {audio_tensor.shape}")
 
-            if self.device == "cuda" and torch.cuda.is_available():
+            if self.device == "cuda" and getattr(torch, "cuda", None) and torch.cuda.is_available():
                 audio_tensor = audio_tensor.cuda()
 
             # Transcribe using the correct NeMo method
