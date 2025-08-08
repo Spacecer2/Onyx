@@ -50,3 +50,7 @@ tqdm>=4.64.0
 packaging>=21.0
 setuptools>=65.0.0
 wheel>=0.37.0
+
+# Enhanced Vision Dependencies
+pytesseract>=0.3.10
+scikit-learn>=1.1.0

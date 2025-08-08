@@ -49,6 +49,13 @@ try:
 except ImportError:
     MEMORY_AVAILABLE = False
 
+# Enhanced vision system
+try:
+    from ..vision.enhanced_analysis import get_enhanced_vision
+    VISION_AVAILABLE = True
+except ImportError:
+    VISION_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 class CommandProcessor:
@@ -66,6 +73,7 @@ class CommandProcessor:
         self.vscode_integration = None
         self.personality = None
         self.memory_manager = None
+        self.enhanced_vision = None
 
         if ADVANCED_FEATURES_AVAILABLE:
             try:
@@ -88,6 +96,13 @@ class CommandProcessor:
                 logger.info("JARVIS memory system loaded")
             except Exception as e:
                 logger.warning(f"Failed to load memory system: {e}")
+
+        if VISION_AVAILABLE:
+            try:
+                self.enhanced_vision = get_enhanced_vision()
+                logger.info("JARVIS enhanced vision system loaded")
+            except Exception as e:
+                logger.warning(f"Failed to load enhanced vision system: {e}")
         
         # Command patterns
         self.command_patterns = {
@@ -208,6 +223,13 @@ class CommandProcessor:
                 r'\b(set preference|update preference|remember)\b\s+(.+)',
                 r'\b(my name is|call me)\b\s+(.+)',
                 r'\b(greeting style|preferred greeting)\b\s+(.+)'
+            ],
+            'vision_analysis': [
+                r'\b(analyze image|read image|scan image|ocr|extract text)\b',
+                r'\b(what do you see|describe image|image analysis)\b',
+                r'\b(detect objects|find objects|count objects)\b',
+                r'\b(detect faces|count faces|face detection)\b',
+                r'\b(analyze colors|color analysis|dominant colors)\b'
             ]
         }
         
@@ -368,6 +390,9 @@ class CommandProcessor:
             elif command_type == 'preferences':
                 preference_text = match.group(2) if len(match.groups()) > 1 else match.group(1)
                 return self._handle_preferences(text, preference_text)
+
+            elif command_type == 'vision_analysis':
+                return self._handle_vision_analysis(text)
 
             else:
                 # Try smart chat as fallback for unmatched commands
@@ -1157,3 +1182,84 @@ All systems are operating within normal parameters."""
                    "- 'Greeting style formal/casual'\n" + \
                    "- 'Set preference [key] [value]'\n" + \
                    "- 'Remember [something]'"
+
+    def _handle_vision_analysis(self, text: str) -> str:
+        """Handle vision analysis commands"""
+        if not self.enhanced_vision:
+            return "Enhanced vision analysis is not available. Please install required dependencies."
+        
+        # Check if we have access to camera or image data
+        if not self.jarvis or not hasattr(self.jarvis, 'camera_manager'):
+            return "Camera is not available for image analysis."
+        
+        try:
+            # Get current camera frame
+            frame = self.jarvis.get_camera_frame()
+            if frame is None:
+                return "No image available for analysis. Please take a photo first."
+            
+            # Convert frame to numpy array if needed
+            if isinstance(frame, bytes):
+                # Convert bytes to numpy array
+                nparr = np.frombuffer(frame, np.uint8)
+                image_data = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            else:
+                image_data = frame
+            
+            # Perform comprehensive analysis
+            analysis = self.enhanced_vision.analyze_image_comprehensive(image_data)
+            
+            # Generate response based on analysis
+            return self._format_vision_analysis_response(analysis, text)
+            
+        except Exception as e:
+            logger.error(f"Vision analysis failed: {e}")
+            return f"Vision analysis failed: {str(e)}"
+    
+    def _format_vision_analysis_response(self, analysis: Dict[str, Any], original_command: str) -> str:
+        """Format vision analysis results into a human-readable response"""
+        command_lower = original_command.lower()
+        response_parts = []
+        
+        # Check what the user specifically asked for
+        if 'text' in command_lower or 'ocr' in command_lower or 'read' in command_lower:
+            text_content = analysis.get('text_content', '')
+            if text_content and text_content != "OCR not available":
+                response_parts.append(f"I found this text in the image: \"{text_content}\"")
+            else:
+                response_parts.append("No text was detected in the image.")
+        
+        if 'object' in command_lower or 'find' in command_lower:
+            objects = analysis.get('objects_detected', [])
+            if objects:
+                object_types = [obj['type'] for obj in objects]
+                unique_types = list(set(object_types))
+                response_parts.append(f"I detected {len(objects)} objects: {', '.join(unique_types)}")
+            else:
+                response_parts.append("No distinct objects were detected.")
+        
+        if 'face' in command_lower:
+            faces = analysis.get('faces_detected', {})
+            face_count = faces.get('count', 0)
+            if face_count > 0:
+                response_parts.append(f"I detected {face_count} face(s) in the image.")
+            else:
+                response_parts.append("No faces were detected in the image.")
+        
+        if 'color' in command_lower:
+            colors = analysis.get('color_analysis', {})
+            if 'dominant_colors' in colors and colors['dominant_colors']:
+                response_parts.append(f"I found {len(colors['dominant_colors'])} dominant colors in the image.")
+            else:
+                response_parts.append("Color analysis completed.")
+        
+        # If no specific analysis was requested, provide a summary
+        if not response_parts:
+            summary = self.enhanced_vision.get_analysis_summary(analysis)
+            response_parts.append(f"Image analysis complete: {summary}")
+        
+        # Add performance info
+        analysis_time = analysis.get('analysis_time', 0)
+        response_parts.append(f"Analysis took {analysis_time:.2f} seconds.")
+        
+        return " ".join(response_parts)
