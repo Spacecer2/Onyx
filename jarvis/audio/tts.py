@@ -2,20 +2,30 @@
 Text-to-Speech (TTS) module using NeMo
 """
 
-import torch
+# Guard optional heavy deps so imports don't crash in minimal environments
+try:
+    import torch  # type: ignore
+except Exception:  # pragma: no cover
+    torch = None  # type: ignore
+
 import numpy as np
-import soundfile as sf
 import logging
 import tempfile
 import os
 from typing import Optional, Union
 from pathlib import Path
 
+# soundfile is optional; if missing, mock synthesis will be disabled file-write and return None
 try:
-    import nemo.collections.tts as nemo_tts
+    import soundfile as sf  # type: ignore
+except Exception:  # pragma: no cover
+    sf = None  # type: ignore
+
+try:
+    import nemo.collections.tts as nemo_tts  # type: ignore
 except ImportError:
     print("Warning: NeMo TTS collection not available. Some features may not work.")
-    nemo_tts = None
+    nemo_tts = None  # type: ignore
 
 from ..config.config import config
 
@@ -52,7 +62,7 @@ class NeMoTTS:
                 )
                 
                 # Move to appropriate device
-                if torch.cuda.is_available() and self.device == "cuda":
+                if torch is not None and getattr(torch, "cuda", None) and torch.cuda.is_available() and self.device == "cuda":
                     self.model = self.model.cuda()
                     self.vocoder = self.vocoder.cuda()
                 else:
@@ -83,6 +93,9 @@ class NeMoTTS:
             if self.model is None or self.vocoder is None:
                 return self._mock_synthesis(text, output_file)
             
+            if torch is None:
+                return False
+            
             # Generate spectrogram
             with torch.no_grad():
                 parsed_text = self.model.parse(text)
@@ -92,14 +105,17 @@ class NeMoTTS:
                 audio = self.vocoder.convert_spectrogram_to_audio(spec=spectrogram)
             
             # Convert to numpy and save
-            if isinstance(audio, torch.Tensor):
+            if hasattr(audio, "cpu"):
                 audio = audio.cpu().numpy()
             
             # Ensure audio is in the right shape
             if len(audio.shape) > 1:
                 audio = audio.squeeze()
             
-            # Save to file
+            if sf is None:
+                logger.error("soundfile not available to write audio")
+                return False
+            
             sf.write(output_file, audio, config.audio.sample_rate)
             logger.info(f"Audio synthesized and saved to {output_file}")
             return True
@@ -111,7 +127,7 @@ class NeMoTTS:
     def synthesize_to_audio(self, text: str) -> Optional[np.ndarray]:
         """Synthesize text to audio data"""
         try:
-            if self.model is None or self.vocoder is None:
+            if self.model is None or self.vocoder is None or torch is None:
                 return self._mock_audio_synthesis(text)
             
             # Generate spectrogram
@@ -123,7 +139,7 @@ class NeMoTTS:
                 audio = self.vocoder.convert_spectrogram_to_audio(spec=spectrogram)
             
             # Convert to numpy
-            if isinstance(audio, torch.Tensor):
+            if hasattr(audio, "cpu"):
                 audio = audio.cpu().numpy()
             
             # Ensure audio is in the right shape
@@ -139,17 +155,23 @@ class NeMoTTS:
     def _mock_synthesis(self, text: str, output_file: str) -> bool:
         """Mock synthesis for testing when model is not available"""
         try:
+            if sf is None:
+                logger.warning("soundfile not available; skipping file write in mock synthesis")
+                return False
+            
             # Generate a simple sine wave as placeholder
-            duration = len(text) * 0.1  # Rough estimate based on text length
+            duration = max(0.1, len(text) * 0.05)  # Shorter to be fast
             sample_rate = config.audio.sample_rate
-            t = np.linspace(0, duration, int(sample_rate * duration))
+            t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
             
             # Generate a simple tone
             frequency = 440  # A4 note
-            audio = 0.3 * np.sin(2 * np.pi * frequency * t)
+            audio = 0.2 * np.sin(2 * np.pi * frequency * t)
             
-            # Add some variation to make it less monotonous
-            audio *= np.exp(-t * 0.5)  # Fade out
+            # Add slight envelope
+            env = np.minimum(1.0, np.linspace(0, 5, audio.size))
+            env = np.minimum(env, np.linspace(5, 0, audio.size))
+            audio *= np.clip(env, 0, 1)
             
             sf.write(output_file, audio, sample_rate)
             logger.info(f"Mock audio generated for: '{text[:50]}...'")
@@ -161,13 +183,12 @@ class NeMoTTS:
     
     def _mock_audio_synthesis(self, text: str) -> np.ndarray:
         """Mock audio synthesis returning numpy array"""
-        duration = len(text) * 0.1
+        duration = max(0.1, len(text) * 0.05)
         sample_rate = config.audio.sample_rate
-        t = np.linspace(0, duration, int(sample_rate * duration))
+        t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
         
         frequency = 440
-        audio = 0.3 * np.sin(2 * np.pi * frequency * t)
-        audio *= np.exp(-t * 0.5)
+        audio = 0.2 * np.sin(2 * np.pi * frequency * t)
         
         return audio.astype(np.float32)
     

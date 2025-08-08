@@ -3,7 +3,11 @@ Sound feedback system for JARVIS
 """
 
 import numpy as np
-import pyaudio
+# Optional dependency: pyaudio may be unavailable
+try:
+    import pyaudio  # type: ignore
+except Exception:  # pragma: no cover
+    pyaudio = None  # type: ignore
 import threading
 import time
 import logging
@@ -21,11 +25,16 @@ class SoundFeedback:
     
     def _initialize_audio(self):
         """Initialize PyAudio"""
+        if pyaudio is None:
+            logger.warning("PyAudio not available. Sound feedback disabled.")
+            self.audio = None
+            return
         try:
             self.audio = pyaudio.PyAudio()
             logger.debug("Audio feedback system initialized")
         except Exception as e:
             logger.error(f"Failed to initialize audio feedback: {e}")
+            self.audio = None
     
     def _generate_tone(self, frequency: float, duration: float, volume: float = 0.3) -> np.ndarray:
         """Generate a pure tone"""
@@ -69,12 +78,12 @@ class SoundFeedback:
     def _play_audio(self, audio_data: np.ndarray):
         """Play audio data"""
         if self.audio is None:
-            logger.warning("Audio system not initialized")
+            logger.debug("Audio system not initialized; skipping feedback playback")
             return
         
         try:
             stream = self.audio.open(
-                format=pyaudio.paFloat32,
+                format=getattr(pyaudio, "paFloat32", 1),
                 channels=1,
                 rate=self.sample_rate,
                 output=True
@@ -150,7 +159,10 @@ class SoundFeedback:
     def cleanup(self):
         """Cleanup audio resources"""
         if self.audio:
-            self.audio.terminate()
+            try:
+                self.audio.terminate()
+            except Exception:
+                pass
             self.audio = None
 
 # Global sound feedback instance

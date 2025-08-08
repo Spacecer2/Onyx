@@ -7,7 +7,11 @@ import threading
 import logging
 import queue
 import numpy as np
-import pyaudio
+# Optional dependency: pyaudio might be unavailable in CI/minimal envs
+try:
+    import pyaudio  # type: ignore
+except Exception:  # pragma: no cover
+    pyaudio = None  # type: ignore
 from typing import Optional, Callable, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
@@ -25,6 +29,7 @@ class AudioState(Enum):
     LISTENING = "listening"
     ERROR = "error"
     RECOVERING = "recovering"
+    DISABLED = "disabled"
 
 @dataclass
 class AudioConfig:
@@ -32,7 +37,7 @@ class AudioConfig:
     sample_rate: int = 16000
     channels: int = 1
     chunk_size: int = 1024
-    format: int = pyaudio.paInt16
+    format: int = getattr(pyaudio, "paInt16", 8) if pyaudio else 8  # default fallback value
     input_device_index: Optional[int] = None
     
     # Fallback configurations
@@ -55,7 +60,7 @@ class RobustAudioManager:
         # Audio system
         self.pyaudio_instance = None
         self.stream = None
-        self.state = AudioState.STOPPED
+        self.state = AudioState.STOPPED if pyaudio else AudioState.DISABLED
         
         # Voice activity detection
         self.vad_threshold = config.audio.vad_threshold
@@ -98,6 +103,12 @@ class RobustAudioManager:
     
     def initialize(self) -> bool:
         """Initialize audio system with retry logic"""
+        if pyaudio is None:
+            logger.warning("PyAudio not available. Audio subsystem disabled.")
+            with self.lock:
+                self.state = AudioState.DISABLED
+            return False
+        
         with self.lock:
             if self.state == AudioState.INITIALIZING:
                 logger.warning("Audio system already initializing")
@@ -153,6 +164,10 @@ class RobustAudioManager:
     
     def start_listening(self) -> bool:
         """Start voice listening with error handling"""
+        if pyaudio is None:
+            logger.warning("PyAudio not available. Cannot start listening.")
+            return False
+        
         with self.lock:
             if self.state not in [AudioState.READY, AudioState.STOPPED]:
                 if self.state == AudioState.ERROR:
@@ -241,7 +256,8 @@ class RobustAudioManager:
             self.processing_thread.join(timeout=5.0)
         
         with self.lock:
-            self.state = AudioState.STOPPED
+            # If audio is disabled due to missing pyaudio, stay DISABLED; else STOPPED
+            self.state = AudioState.DISABLED if pyaudio is None else AudioState.STOPPED
         
         logger.info("Voice listening stopped")
     
@@ -277,6 +293,8 @@ class RobustAudioManager:
     
     def _find_working_audio_config(self) -> bool:
         """Find a working audio configuration"""
+        if pyaudio is None:
+            return False
         logger.debug("Finding working audio configuration")
         
         # Try different sample rates
@@ -316,6 +334,8 @@ class RobustAudioManager:
     
     def _test_audio_input(self) -> bool:
         """Test audio input functionality"""
+        if pyaudio is None:
+            return False
         try:
             logger.debug("Testing audio input")
             
@@ -368,7 +388,7 @@ class RobustAudioManager:
         except Exception as e:
             logger.error(f"Error in audio callback: {e}")
         
-        return (None, pyaudio.paContinue)
+        return (None, getattr(pyaudio, "paContinue", 0))
     
     def _audio_processing_loop(self):
         """Main audio processing loop"""
@@ -524,7 +544,7 @@ class RobustAudioManager:
         """Cleanup audio resources"""
         if self.stream:
             try:
-                if self.stream.is_active():
+                if getattr(self.stream, "is_active", lambda: False)():
                     self.stream.stop_stream()
                 self.stream.close()
             except Exception as e:
@@ -548,7 +568,7 @@ class RobustAudioManager:
 # Global robust audio manager instance
 robust_audio_manager = None
 
-def get_audio_manager() -> RobustAudioManager:
+def get_audio_manager() -> 'RobustAudioManager':
     """Get global audio manager instance"""
     global robust_audio_manager
     if robust_audio_manager is None:
