@@ -42,6 +42,13 @@ try:
 except ImportError:
     PERSONALITY_AVAILABLE = False
 
+# Memory system
+try:
+    from ..core.memory_manager import get_memory_manager
+    MEMORY_AVAILABLE = True
+except ImportError:
+    MEMORY_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 class CommandProcessor:
@@ -58,6 +65,7 @@ class CommandProcessor:
         self.openai_integration = None
         self.vscode_integration = None
         self.personality = None
+        self.memory_manager = None
 
         if ADVANCED_FEATURES_AVAILABLE:
             try:
@@ -73,6 +81,13 @@ class CommandProcessor:
                 logger.info("JARVIS personality system loaded")
             except Exception as e:
                 logger.warning(f"Failed to load personality system: {e}")
+
+        if MEMORY_AVAILABLE:
+            try:
+                self.memory_manager = get_memory_manager()
+                logger.info("JARVIS memory system loaded")
+            except Exception as e:
+                logger.warning(f"Failed to load memory system: {e}")
         
         # Command patterns
         self.command_patterns = {
@@ -188,30 +203,84 @@ class CommandProcessor:
                 r'\b(find files|locate|search files)\b\s+(.+)',
                 r'\b(recent files|last opened|history)\b',
                 r'\b(bookmarks|favorites|saved)\b'
+            ],
+            'preferences': [
+                r'\b(set preference|update preference|remember)\b\s+(.+)',
+                r'\b(my name is|call me)\b\s+(.+)',
+                r'\b(greeting style|preferred greeting)\b\s+(.+)'
             ]
         }
         
         logger.info("CommandProcessor initialized with advanced capabilities")
     
     def process_command(self, text: str) -> str:
-        """Process a command and return response"""
+        """Process a command and return response with memory integration"""
         text = text.lower().strip()
+        start_time = time.time()
         
         try:
+            # Get conversation context if memory is available
+            context = None
+            if self.memory_manager:
+                context = {
+                    'recent_conversations': self.memory_manager.get_conversation_context(),
+                    'user_preferences': self.memory_manager.get_user_preferences()
+                }
+            
             # Check each command pattern
             for command_type, patterns in self.command_patterns.items():
                 for pattern in patterns:
                     match = re.search(pattern, text, re.IGNORECASE)
                     if match:
                         logger.info(f"Command matched: {command_type}")
-                        return self._execute_command(command_type, text, match)
+                        response = self._execute_command(command_type, text, match)
+                        
+                        # Store conversation in memory
+                        if self.memory_manager:
+                            processing_time = time.time() - start_time
+                            self.memory_manager.store_conversation(
+                                user_input=text,
+                                jarvis_response=response,
+                                context=context,
+                                command_type=command_type,
+                                processing_time=processing_time
+                            )
+                        
+                        return response
             
             # If no pattern matches, try general conversation
-            return self._handle_general_query(text)
+            response = self._handle_general_query(text)
+            
+            # Store conversation in memory
+            if self.memory_manager:
+                processing_time = time.time() - start_time
+                self.memory_manager.store_conversation(
+                    user_input=text,
+                    jarvis_response=response,
+                    context=context,
+                    command_type='general_query',
+                    processing_time=processing_time
+                )
+            
+            return response
             
         except Exception as e:
             logger.error(f"Error processing command: {e}")
-            return f"I encountered an error: {str(e)}"
+            error_response = f"I encountered an error: {str(e)}"
+            
+            # Store error in memory
+            if self.memory_manager:
+                processing_time = time.time() - start_time
+                self.memory_manager.store_conversation(
+                    user_input=text,
+                    jarvis_response=error_response,
+                    context=context,
+                    command_type='error',
+                    processing_time=processing_time,
+                    success=False
+                )
+            
+            return error_response
     
     def _execute_command(self, command_type: str, text: str, match) -> str:
         """Execute a specific command type"""
@@ -296,6 +365,10 @@ class CommandProcessor:
                 query = match.group(2) if len(match.groups()) > 1 else ""
                 return self._handle_advanced_search(text, query)
 
+            elif command_type == 'preferences':
+                preference_text = match.group(2) if len(match.groups()) > 1 else match.group(1)
+                return self._handle_preferences(text, preference_text)
+
             else:
                 # Try smart chat as fallback for unmatched commands
                 if self.openai_integration:
@@ -308,26 +381,55 @@ class CommandProcessor:
             return f"Error executing command: {str(e)}"
     
     def _handle_greeting(self) -> str:
-        """Handle greeting commands"""
+        """Handle greeting commands with memory-based personalization"""
+        # Get user preferences for personalized greeting
+        user_name = None
+        preferred_greeting_style = "default"
+        
+        if self.memory_manager:
+            user_name = self.memory_manager.get_preference("user_name")
+            preferred_greeting_style = self.memory_manager.get_preference("greeting_style", "default")
+        
         if self.personality:
             # Use personality system for contextual greeting
             greeting = self.personality.get_greeting()
             self.personality.update_context("greeting", "friendly")
             return greeting
         else:
-            # Fallback greeting
+            # Enhanced greeting with memory integration
             current_hour = datetime.datetime.now().hour
 
             if 5 <= current_hour < 12:
-                greeting = "Good morning!"
+                time_greeting = "Good morning!"
             elif 12 <= current_hour < 17:
-                greeting = "Good afternoon!"
+                time_greeting = "Good afternoon!"
             elif 17 <= current_hour < 21:
-                greeting = "Good evening!"
+                time_greeting = "Good evening!"
             else:
-                greeting = "Hello!"
+                time_greeting = "Hello!"
 
-            return f"{greeting} I'm JARVIS, your AI assistant. How can I help you today?"
+            # Personalized greeting
+            if user_name:
+                if preferred_greeting_style == "formal":
+                    greeting = f"{time_greeting} {user_name}. How may I be of assistance?"
+                elif preferred_greeting_style == "casual":
+                    greeting = f"{time_greeting} {user_name}! What's up?"
+                else:
+                    greeting = f"{time_greeting} {user_name}! I'm JARVIS, your AI assistant. How can I help you today?"
+            else:
+                greeting = f"{time_greeting} I'm JARVIS, your AI assistant. How can I help you today?"
+
+            # Check recent conversations for context
+            if self.memory_manager:
+                recent_conversations = self.memory_manager.get_recent_conversations(limit=3)
+                if recent_conversations:
+                    last_command = recent_conversations[0]['user_input'].lower()
+                    if 'weather' in last_command:
+                        greeting += " I see you were asking about the weather earlier. Is there anything else you'd like to know?"
+                    elif 'time' in last_command:
+                        greeting += " I noticed you were checking the time. What else can I help you with?"
+
+            return greeting
     
     def _handle_time(self) -> str:
         """Handle time queries"""
@@ -964,33 +1066,94 @@ All systems are operating within normal parameters."""
             return "System status: Basic mode active. Core functions operational."
 
     def _handle_advanced_search(self, text: str, query: str) -> str:
-        """Handle advanced search and file operations"""
+        """Handle advanced search queries"""
+        if not query:
+            return "What would you like me to search for?"
+        
+        try:
+            # Enhanced search with multiple sources
+            results = []
+            
+            # Web search
+            try:
+                search_results = self._handle_web_search(query)
+                results.append(f"Web search: {search_results}")
+            except Exception as e:
+                logger.warning(f"Web search failed: {e}")
+            
+            # Wikipedia search
+            try:
+                wiki_results = self._handle_wikipedia(query)
+                results.append(f"Wikipedia: {wiki_results}")
+            except Exception as e:
+                logger.warning(f"Wikipedia search failed: {e}")
+            
+            if results:
+                return "Here's what I found:\n" + "\n".join(results)
+            else:
+                return f"I couldn't find comprehensive information about '{query}'. Try a more specific search term."
+                
+        except Exception as e:
+            logger.error(f"Advanced search error: {e}")
+            return f"Search failed: {str(e)}"
+
+    def _handle_preferences(self, text: str, preference_text: str) -> str:
+        """Handle user preference updates"""
+        if not self.memory_manager:
+            return "Memory system is not available. I can't save preferences right now."
+        
         text_lower = text.lower()
-
-        if 'find files' in text_lower or 'locate' in text_lower:
-            if self.vscode_integration and query:
-                try:
-                    files = self.vscode_integration.get_workspace_files()
-                    matching_files = [f for f in files if query.lower() in f.lower()]
-
-                    if matching_files:
-                        return f"Found {len(matching_files)} files matching '{query}': {', '.join(matching_files[:5])}"
-                    else:
-                        return f"No files found matching '{query}'"
-                except Exception as e:
-                    return f"File search error: {str(e)}"
+        
+        # Handle name setting
+        if 'my name is' in text_lower or 'call me' in text_lower:
+            # Extract name from the command
+            name_match = re.search(r'(?:my name is|call me)\s+(\w+)', text_lower)
+            if name_match:
+                name = name_match.group(1).title()
+                self.memory_manager.update_preference("user_name", name, "User's preferred name")
+                return f"Nice to meet you, {name}! I'll remember your name."
             else:
-                return "Please specify what files you're looking for."
-
-        elif 'recent files' in text_lower or 'history' in text_lower:
-            if self.vscode_integration:
-                recent = self.vscode_integration.recent_files
-                if recent:
-                    return f"Recent files: {', '.join(recent[:5])}"
-                else:
-                    return "No recent files in history."
+                return "I didn't catch your name. Could you say 'My name is [your name]'?"
+        
+        # Handle greeting style
+        elif 'greeting style' in text_lower or 'preferred greeting' in text_lower:
+            if 'formal' in text_lower:
+                self.memory_manager.update_preference("greeting_style", "formal", "Formal greeting style")
+                return "I'll use a formal greeting style from now on."
+            elif 'casual' in text_lower:
+                self.memory_manager.update_preference("greeting_style", "casual", "Casual greeting style")
+                return "I'll use a casual greeting style from now on."
             else:
-                return "File history not available."
-
+                self.memory_manager.update_preference("greeting_style", "default", "Default greeting style")
+                return "I'll use the default greeting style."
+        
+        # Handle general preference setting
+        elif 'set preference' in text_lower or 'update preference' in text_lower:
+            # Try to extract key-value pair
+            preference_match = re.search(r'(?:set preference|update preference)\s+(\w+)\s+(.+)', text_lower)
+            if preference_match:
+                key = preference_match.group(1)
+                value = preference_match.group(2).strip()
+                self.memory_manager.update_preference(key, value, f"User preference for {key}")
+                return f"I've updated your preference: {key} = {value}"
+            else:
+                return "Please specify a preference key and value. For example: 'Set preference theme dark'"
+        
+        # Handle general "remember" commands
+        elif 'remember' in text_lower:
+            # Extract what to remember
+            remember_match = re.search(r'remember\s+(.+)', text_lower)
+            if remember_match:
+                memory_text = remember_match.group(1).strip()
+                # Store as a general memory
+                self.memory_manager.update_preference("memory_" + str(int(time.time())), memory_text, "User memory")
+                return f"I'll remember that: {memory_text}"
+            else:
+                return "What would you like me to remember?"
+        
         else:
-            return "I can help you find files, search in code, or show recent files. What are you looking for?"
+            return "I can help you set preferences. Try saying:\n" + \
+                   "- 'My name is [your name]'\n" + \
+                   "- 'Greeting style formal/casual'\n" + \
+                   "- 'Set preference [key] [value]'\n" + \
+                   "- 'Remember [something]'"
